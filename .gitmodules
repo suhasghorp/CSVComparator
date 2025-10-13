@@ -1,3 +1,6 @@
 [submodule "external/tracy"]
 	path = external/tracy
 	url = https://github.com/wolfpld/tracy.git
+[submodule "external/wyhash"]
+	path = external/wyhash
+	url = https://github.com/wangyi-fudan/wyhash.git

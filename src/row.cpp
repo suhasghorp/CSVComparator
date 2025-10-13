@@ -1,4 +1,5 @@
 #include "row.h"
+#include <wyhash.h>
 
 bool Row::operator==(const Row& other) const {
     if (columns.size() != other.columns.size()) return false;
@@ -12,6 +13,7 @@ bool Row::operator==(const Row& other) const {
 }
 
 bool Row::compareValues(std::string_view v1, std::string_view v2) {
+    // Try to parse as double
     try {
         size_t pos1, pos2;
         std::string s1(v1);
@@ -19,25 +21,42 @@ bool Row::compareValues(std::string_view v1, std::string_view v2) {
         double d1 = std::stod(s1, &pos1);
         double d2 = std::stod(s2, &pos2);
 
+        // Check if entire strings were consumed (they are valid numbers)
         if (pos1 == v1.length() && pos2 == v2.length()) {
+            // Round to 4 decimal places and compare
             double rounded1 = std::round(d1 * 10000.0) / 10000.0;
             double rounded2 = std::round(d2 * 10000.0) / 10000.0;
             return std::abs(rounded1 - rounded2) < 1e-9;
         }
     }
     catch (...) {
+        // Not a number, fall through to string comparison
     }
 
+    // String comparison (case-sensitive)
     return v1 == v2;
 }
 
+// ? OPTIMIZED: Using wyhash instead of std::hash
 size_t Row::Hash::operator()(const Row& row) const {
-    size_t hash = 0;
+    // Use wyhash with cumulative hashing
+    uint64_t hash = 0;
+
     for (const auto& col : row.columns) {
+        // Normalize value for hashing (handles decimal comparison)
         std::string normalized = normalizeForHash(col);
-        hash ^= std::hash<std::string>{}(normalized)+0x9e3779b9 + (hash << 6) + (hash >> 2);
+
+        // Hash the normalized value using wyhash
+        // Previous hash is used as seed for next iteration
+        hash = wyhash(normalized.data(), normalized.size(), hash, _wyp);
+
+        // Mix in a null byte as delimiter to prevent concatenation issues
+        // "ab" + "cd" should hash differently from "abc" + "d"
+        const char delimiter = '\0';
+        hash = wyhash(&delimiter, 1, hash, _wyp);
     }
-    return hash;
+
+    return static_cast<size_t>(hash);
 }
 
 std::string Row::Hash::normalizeForHash(std::string_view value) {
@@ -46,6 +65,7 @@ std::string Row::Hash::normalizeForHash(std::string_view value) {
         std::string s(value);
         double d = std::stod(s, &pos);
         if (pos == value.length()) {
+            // It's a valid number, normalize to 4 decimal places
             double rounded = std::round(d * 10000.0) / 10000.0;
             std::ostringstream oss;
             oss << std::fixed << std::setprecision(4) << rounded;
@@ -53,6 +73,7 @@ std::string Row::Hash::normalizeForHash(std::string_view value) {
         }
     }
     catch (...) {
+        // Not a number
     }
     return std::string(value);
 }

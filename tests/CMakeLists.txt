@@ -9,6 +9,7 @@ add_executable(csv_comparator_test
 
 target_include_directories(csv_comparator_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_SOURCE_DIR}/external/wyhash
 )
 
 target_link_libraries(csv_comparator_test PRIVATE

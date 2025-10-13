@@ -5,7 +5,10 @@ add_executable(csv_compare
     threaded_comparator.cpp
 )
 
-target_include_directories(csv_compare PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(csv_compare PRIVATE 
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/external/wyhash
+)
 
 target_link_libraries(csv_compare PRIVATE
     Boost::boost
