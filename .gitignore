@@ -1,0 +1,45 @@
+# CMake build directories
+/build/
+/out/
+/cmake-build-*/
+/CMakeCache.txt
+/CMakeFiles/
+/install/
+/Testing/
+!/build/src/Release/csv_compare.exe
+!/build/tests/Release/csv_comparator_test.exe
+
+# Visual Studio specific files
+.vs/
+*.vcxproj.user
+*.suo
+*.sln.docstates
+*.user
+*.tlog
+*.lastbuildstate
+*.VC.db
+*.VC.VC.opendb
+*.log
+*.pdb
+*.ilk
+*.obj
+*.exe
+*.dll
+*.lib
+*.exp
+*.idb
+*.ipch
+*.vsidx
+
+# Other generated files
+*.o
+*.a
+*.so
+*.dylib
+*.lo
+*.la
+*.d
+
+# Package manager files (if applicable)
+packages/
+node_modules/ # For JavaScript/TypeScript projects
