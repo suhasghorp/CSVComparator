@@ -8,6 +8,8 @@ add_executable(file_compare
     file_comparator.cpp
 )
 
+
+
 target_include_directories(file_compare PRIVATE 
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/external/wyhash
