@@ -1,4 +1,4 @@
-#include "threaded_comparator.h"
+﻿#include "csv_comparator.h"
 #include <iostream>
 #include <cstdio>
 #include <sstream>
@@ -17,6 +17,11 @@ std::string formatRow(const Row& row) {
 int main(int argc, char* argv[]) {
     if (argc != 3) {
         std::cerr << "Usage: " << argv[0] << " <file1.csv> <file2.csv>" << std::endl;
+        std::cerr << std::endl;
+        std::cerr << "CSV Comparator - High-performance CSV file comparison" << std::endl;
+        std::cerr << "Compares two CSV files and reports differences." << std::endl;
+        std::cerr << "Files can be in any order (order-independent comparison)." << std::endl;
+        std::cerr << "Decimal numbers are compared to 4 decimal places." << std::endl;
         return 1;
     }
 
@@ -24,11 +29,13 @@ int main(int argc, char* argv[]) {
         std::string file1 = argv[1];
         std::string file2 = argv[2];
 
-        ThreadedCSVComparator comparator;
+        CSVComparator comparator;
         auto result = comparator.compare(file1, file2);
 
+        std::cout << std::endl;
+
         if (result.filesMatch) {
-            std::cout << "? FILES MATCH" << std::endl;
+            std::cout << "FILES MATCH" << std::endl;
             std::cout << "Both files contain the same " << result.file1RowCount
                 << " rows (including headers, ignoring order)." << std::endl;
             std::cout << "Decimal comparison: first 4 decimal places only." << std::endl;
@@ -37,7 +44,7 @@ int main(int argc, char* argv[]) {
             std::remove("only_in_file2.csv");
         }
         else {
-            std::cout << "? FILES DIFFER" << std::endl;
+            std::cout << "FILES DIFFER" << std::endl;
             std::cout << std::endl;
 
             std::cout << "Summary:" << std::endl;

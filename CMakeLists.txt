@@ -20,9 +20,6 @@ if(ENABLE_TRACY)
     add_subdirectory(external/tracy)
 endif()
 
-# Find required packages
-find_package(Boost REQUIRED COMPONENTS system)
-find_package(Threads REQUIRED)
 
 # Add source directory
 add_subdirectory(src)

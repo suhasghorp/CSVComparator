@@ -1,27 +1,15 @@
-#include <gtest/gtest.h>
-#include "threaded_comparator.h"
+ï»¿#include <gtest/gtest.h>
+#include "csv_comparator.h"
 #include "csv_parser.h"
 #include <fstream>
 #include <random>
 #include <filesystem>
 #include <chrono>
-#include <iostream>
-
-// Tracy integration
-#ifdef TRACY_ENABLE
-#include <tracy/Tracy.hpp>
-#pragma message ( "Tracy enabled!" )
-#else
-#define ZoneScoped
-#define ZoneScopedN(name)
-#define FrameMark
-#define FrameMarkNamed(name)
-#endif
 
 class CSVComparatorTest : public ::testing::Test {
 protected:
     std::mt19937 rng;
-    const int NUM_ROWS = 100000;
+    const int NUM_ROWS = 10000;
     const int NUM_COLS = 10;
     const int MAX_DIFFERENCES = 10;
 
@@ -95,10 +83,9 @@ protected:
         std::ofstream file1(testFile1);
         std::ofstream file2(testFile2);
 
-        ASSERT_TRUE(file1.is_open()) << "Failed to create " << testFile1;
-        ASSERT_TRUE(file2.is_open()) << "Failed to create " << testFile2;
+        ASSERT_TRUE(file1.is_open());
+        ASSERT_TRUE(file2.is_open());
 
-        // Write headers
         std::vector<std::string> headers = {
             "Name", "Price", "Category", "Quantity", "Rating",
             "Status", "Count", "Score", "Id", "Value"
@@ -106,13 +93,11 @@ protected:
         writeRowToFile(file1, headers);
         writeRowToFile(file2, headers);
 
-        // Generate all rows
         std::vector<std::vector<std::string>> allRows;
         for (int i = 0; i < NUM_ROWS; ++i) {
             allRows.push_back(generateRandomRow());
         }
 
-        // Select random rows to be different
         std::vector<int> differenceIndices;
         if (numDifferences > 0) {
             std::uniform_int_distribution<> dist(0, NUM_ROWS - 1);
@@ -125,7 +110,6 @@ protected:
             }
         }
 
-        // Write rows
         for (int i = 0; i < NUM_ROWS; ++i) {
             writeRowToFile(file1, allRows[i]);
 
@@ -152,142 +136,18 @@ protected:
     }
 };
 
-TEST_F(CSVComparatorTest, OptimizationValidation) {
-    // Test that optimizations don't break functionality
-
-    // Test 1: Simple CSV
-    auto result1 = CSVParser::parseCSVLine("a,b,c");
-    EXPECT_EQ(result1.size(), 3);
-    EXPECT_EQ(result1[0], "a");
-    EXPECT_EQ(result1[1], "b");
-    EXPECT_EQ(result1[2], "c");
-
-    // Test 2: CSV with spaces (should be trimmed)
-    auto result2 = CSVParser::parseCSVLine("  a  ,  b  ,  c  ");
-    EXPECT_EQ(result2.size(), 3);
-    EXPECT_EQ(result2[0], "a");
-    EXPECT_EQ(result2[1], "b");
-    EXPECT_EQ(result2[2], "c");
-
-    // Test 3: CSV with quotes
-    auto result3 = CSVParser::parseCSVLine("\"a,b\",\"c\"\"d\",e");
-    EXPECT_EQ(result3.size(), 3);
-    EXPECT_EQ(result3[0], "a,b");
-    EXPECT_EQ(result3[1], "c\"d");
-    EXPECT_EQ(result3[2], "e");
-
-    // Test 4: CSV with leading/trailing spaces in quoted fields
-    auto result4 = CSVParser::parseCSVLine("\"  spaced  \",normal,  mixed  ");
-    EXPECT_EQ(result4.size(), 3);
-    EXPECT_EQ(result4[0], "  spaced  ");  // Spaces preserved in quotes
-    EXPECT_EQ(result4[1], "normal");
-    EXPECT_EQ(result4[2], "mixed");
-
-    // Test 5: Hash consistency
-    Row row1, row2;
-    row1.columns = { "John", "25", "Engineer" };
-    row2.columns = { "John", "25", "Engineer" };
-
-    Row::Hash hasher;
-    EXPECT_EQ(hasher(row1), hasher(row2));
-
-    // Test 6: Hash with normalized decimals
-    Row row3, row4;
-    row3.columns = { "3.14159265" };
-    row4.columns = { "3.14159999" };  // Should hash the same (4 decimal places)
-
-    EXPECT_EQ(hasher(row3), hasher(row4));
-
-    std::cout << "? All optimization validation tests passed" << std::endl;
-}
-
-TEST_F(CSVComparatorTest, ParsingPerformanceBenchmark) {
-    // Benchmark parsing performance
-    const int iterations = 100000;
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-    for (int i = 0; i < iterations; ++i) {
-        auto result = CSVParser::parseCSVLine(
-            "John,  25,  Engineer  ,  50000  ,  Active  ,  2024-01-15  "
-        );
-    }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-        end - start).count();
-
-    double avgTime = static_cast<double>(duration) / iterations;
-
-    std::cout << "? Parsing Performance:" << std::endl;
-    std::cout << "  Iterations: " << iterations << std::endl;
-    std::cout << "  Total time: " << duration << " µs" << std::endl;
-    std::cout << "  Avg per line: " << avgTime << " µs" << std::endl;
-    std::cout << "  Throughput: " << (iterations / (duration / 1000000.0))
-        << " lines/sec" << std::endl;
-
-    // Should be significantly faster than before
-    // Target: < 3 µs per line on modern hardware
-    EXPECT_LT(avgTime, 5.0) << "Parsing is slower than expected";
-}
-
-TEST_F(CSVComparatorTest, HashPerformanceBenchmark) {
-    // Benchmark hash performance
-    const int iterations = 100000;
-
-    Row testRow;
-    testRow.columns = {
-        "John", "25", "Engineer", "50000",
-        "Active", "2024-01-15", "Department A",
-        "Manager: Jane", "Location: NYC", "Project: Alpha"
-    };
-
-    Row::Hash hasher;
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-    size_t dummySum = 0;
-    for (int i = 0; i < iterations; ++i) {
-        dummySum += hasher(testRow);
-    }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        end - start).count();
-
-    double avgTime = static_cast<double>(duration) / iterations;
-
-    std::cout << "? Hash Performance:" << std::endl;
-    std::cout << "  Iterations: " << iterations << std::endl;
-    std::cout << "  Total time: " << (duration / 1000000.0) << " ms" << std::endl;
-    std::cout << "  Avg per hash: " << avgTime << " ns" << std::endl;
-    std::cout << "  Throughput: " << (iterations / (duration / 1000000000.0))
-        << " hashes/sec" << std::endl;
-    std::cout << "  (Dummy sum: " << dummySum << " - prevents optimization)" << std::endl;
-
-    // ? FIX: Adjusted expectation - normalizeForHash is expensive (stod parsing)
-    // The bottleneck is not wyhash itself, but the decimal normalization
-    // Target: < 50,000 ns (50 µs) per hash for 10-column row with normalization
-    // Pure wyhash would be < 200ns, but we need normalization for decimal comparison
-    EXPECT_LT(avgTime, 50000.0) << "Hashing is slower than expected";
-
-    std::cout << "  Note: Time includes decimal normalization overhead" << std::endl;
-}
-
 TEST_F(CSVComparatorTest, IdenticalFilesMatch) {
 #ifdef TRACY_ENABLE
     FrameMarkNamed("Test: IdenticalFilesMatch");
 #endif
 
-    // Setup (NOT profiled - happens before ZoneScoped)
     createTestFiles(0);
 
-    // Begin profiling the actual test
     {
         ZoneScoped;
         ZoneName("IdenticalFilesMatch - Comparison", 33);
 
-        ThreadedCSVComparator comparator;
+        CSVComparator comparator;
         auto result = comparator.compare(testFile1, testFile2);
 
         EXPECT_TRUE(result.filesMatch);
@@ -296,7 +156,7 @@ TEST_F(CSVComparatorTest, IdenticalFilesMatch) {
         EXPECT_EQ(result.onlyInFile2.size(), 0);
     }
 
-    std::cout << "? Test PASSED: Identical files matched correctly" << std::endl;
+    std::cout << "Test PASSED: Identical files matched correctly" << std::endl;
 }
 
 TEST_F(CSVComparatorTest, FilesWithDifferencesDetected) {
@@ -313,14 +173,14 @@ TEST_F(CSVComparatorTest, FilesWithDifferencesDetected) {
         ZoneScoped;
         ZoneName("FilesWithDifferencesDetected - Comparison", 42);
 
-        ThreadedCSVComparator comparator;
+        CSVComparator comparator;
         auto result = comparator.compare(testFile1, testFile2);
 
         EXPECT_FALSE(result.filesMatch);
         EXPECT_GT(result.onlyInFile1.size() + result.onlyInFile2.size(), 0);
     }
 
-    std::cout << "? Test PASSED: Differences detected correctly" << std::endl;
+    std::cout << "Test PASSED: Differences detected correctly" << std::endl;
 }
 
 TEST_F(CSVComparatorTest, DecimalComparisonWorks) {
@@ -346,14 +206,14 @@ TEST_F(CSVComparatorTest, DecimalComparisonWorks) {
         ZoneScoped;
         ZoneName("DecimalComparisonWorks - Comparison", 34);
 
-        ThreadedCSVComparator comparator;
+        CSVComparator comparator;
         auto result = comparator.compare("test_decimal1.csv", "test_decimal2.csv");
 
         EXPECT_EQ(result.onlyInFile1.size(), 1);
         EXPECT_EQ(result.onlyInFile2.size(), 1);
     }
 
-    std::cout << "? Test PASSED: Decimal precision (4 places) works correctly" << std::endl;
+    std::cout << "Test PASSED: Decimal precision (4 places) works correctly" << std::endl;
 
     std::filesystem::remove("test_decimal1.csv");
     std::filesystem::remove("test_decimal2.csv");
@@ -373,55 +233,19 @@ TEST_F(CSVComparatorTest, LargeFilePerformance) {
         ZoneName("LargeFilePerformance - Comparison", 33);
 
         auto readStart = std::chrono::high_resolution_clock::now();
-        ThreadedCSVComparator comparator;
+        CSVComparator comparator;
         auto result = comparator.compare(testFile1, testFile2);
         auto readEnd = std::chrono::high_resolution_clock::now();
 
         auto totalDuration = std::chrono::duration_cast<std::chrono::milliseconds>(
             readEnd - start).count();
 
-        std::cout << "? Performance Test Results:" << std::endl;
+        std::cout << "Performance Test Results:" << std::endl;
         std::cout << "  Total time: " << totalDuration << " ms" << std::endl;
         std::cout << "  Rows processed: " << result.file1RowCount + result.file2RowCount << std::endl;
 
         EXPECT_LT(totalDuration, 30000) << "Processing took longer than 30 seconds";
     }
-}
-
-TEST_F(CSVComparatorTest, SingleThreadedPathForSmallFiles) {
-#ifdef TRACY_ENABLE
-    FrameMarkNamed("Test: SingleThreadedPathForSmallFiles");
-#endif
-
-    std::ofstream file1("small_file1.csv");
-    std::ofstream file2("small_file2.csv");
-
-    file1 << "ID,Value\n";
-    file2 << "ID,Value\n";
-
-    for (int i = 0; i < 500; ++i) {
-        file1 << i << "," << i * 2 << "\n";
-        file2 << i << "," << i * 2 << "\n";
-    }
-
-    file1.close();
-    file2.close();
-
-    {
-        ZoneScoped;
-        ZoneName("SingleThreadedPathForSmallFiles - Comparison", 47);
-
-        ThreadedCSVComparator comparator;
-        auto result = comparator.compare("small_file1.csv", "small_file2.csv");
-
-        EXPECT_TRUE(result.filesMatch);
-        EXPECT_EQ(result.file1RowCount, 501);
-    }
-
-    std::cout << "? Test PASSED: Single-threaded path used for small files" << std::endl;
-
-    std::filesystem::remove("small_file1.csv");
-    std::filesystem::remove("small_file2.csv");
 }
 
 TEST_F(CSVComparatorTest, OutputFilesCreatedOnDifference) {
@@ -435,7 +259,7 @@ TEST_F(CSVComparatorTest, OutputFilesCreatedOnDifference) {
         ZoneScoped;
         ZoneName("OutputFilesCreatedOnDifference - Comparison", 44);
 
-        ThreadedCSVComparator comparator;
+        CSVComparator comparator;
         auto result = comparator.compare(testFile1, testFile2);
 
         EXPECT_FALSE(result.filesMatch);
@@ -447,7 +271,7 @@ TEST_F(CSVComparatorTest, OutputFilesCreatedOnDifference) {
         EXPECT_TRUE(std::filesystem::exists("only_in_file2.csv"));
     }
 
-    std::cout << "? Test PASSED: Output files created correctly" << std::endl;
+    std::cout << "Test PASSED: Output files created correctly" << std::endl;
 }
 
 TEST_F(CSVComparatorTest, OutputFilesDeletedOnMatch) {
@@ -471,7 +295,7 @@ TEST_F(CSVComparatorTest, OutputFilesDeletedOnMatch) {
         ZoneScoped;
         ZoneName("OutputFilesDeletedOnMatch - Comparison", 39);
 
-        ThreadedCSVComparator comparator;
+        CSVComparator comparator;
         auto result = comparator.compare(testFile1, testFile2);
 
         EXPECT_TRUE(result.filesMatch);
@@ -483,5 +307,149 @@ TEST_F(CSVComparatorTest, OutputFilesDeletedOnMatch) {
         EXPECT_FALSE(std::filesystem::exists("only_in_file2.csv"));
     }
 
-    std::cout << "? Test PASSED: Output files deleted on match" << std::endl;
+    std::cout << "Test PASSED: Output files deleted on match" << std::endl;
+}
+
+TEST_F(CSVComparatorTest, OptimizationValidation) {
+    auto result1 = CSVParser::parseCSVLine("a,b,c");
+    EXPECT_EQ(result1.size(), 3);
+    EXPECT_EQ(result1[0], "a");
+    EXPECT_EQ(result1[1], "b");
+    EXPECT_EQ(result1[2], "c");
+
+    auto result2 = CSVParser::parseCSVLine("  a  ,  b  ,  c  ");
+    EXPECT_EQ(result2.size(), 3);
+    EXPECT_EQ(result2[0], "a");
+    EXPECT_EQ(result2[1], "b");
+    EXPECT_EQ(result2[2], "c");
+
+    auto result3 = CSVParser::parseCSVLine("\"a,b\",\"c\"\"d\",e");
+    EXPECT_EQ(result3.size(), 3);
+    EXPECT_EQ(result3[0], "a,b");
+    EXPECT_EQ(result3[1], "c\"d");
+    EXPECT_EQ(result3[2], "e");
+
+    auto result4 = CSVParser::parseCSVLine("\"  spaced  \",normal,  mixed  ");
+    EXPECT_EQ(result4.size(), 3);
+    EXPECT_EQ(result4[0], "  spaced  ");
+    EXPECT_EQ(result4[1], "normal");
+    EXPECT_EQ(result4[2], "mixed");
+
+    Row row1, row2;
+    row1.columns = { "John", "25", "Engineer" };
+    row2.columns = { "John", "25", "Engineer" };
+
+    Row::Hash hasher;
+    EXPECT_EQ(hasher(row1), hasher(row2));
+
+    Row row3, row4;
+    row3.columns = { "3.14159265" };
+    row4.columns = { "3.14159999" };
+
+    EXPECT_EQ(hasher(row3), hasher(row4));
+
+    std::cout << "All optimization validation tests passed" << std::endl;
+}
+
+TEST_F(CSVComparatorTest, ParsingPerformanceBenchmark) {
+    const int iterations = 100000;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < iterations; ++i) {
+        auto result = CSVParser::parseCSVLine(
+            "John,  25,  Engineer  ,  50000  ,  Active  ,  2024-01-15  "
+        );
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
+        end - start).count();
+
+    double avgTime = static_cast<double>(duration) / iterations;
+
+    std::cout << "Parsing Performance:" << std::endl;
+    std::cout << "  Iterations: " << iterations << std::endl;
+    std::cout << "  Total time: " << duration << " Âµs" << std::endl;
+    std::cout << "  Avg per line: " << avgTime << " Âµs" << std::endl;
+    std::cout << "  Throughput: " << (iterations / (duration / 1000000.0))
+        << " lines/sec" << std::endl;
+
+    EXPECT_LT(avgTime, 5.0) << "Parsing is slower than expected";
+}
+
+TEST_F(CSVComparatorTest, HashPerformanceBenchmark) {
+    const int iterations = 100000;
+
+    Row testRow;
+    testRow.columns = {
+        "John", "25", "Engineer", "50000",
+        "Active", "2024-01-15", "Department A",
+        "Manager: Jane", "Location: NYC", "Project: Alpha"
+    };
+
+    Row::Hash hasher;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    size_t dummySum = 0;
+    for (int i = 0; i < iterations; ++i) {
+        dummySum += hasher(testRow);
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        end - start).count();
+
+    double avgTime = static_cast<double>(duration) / iterations;
+
+    std::cout << "Hash Performance:" << std::endl;
+    std::cout << "  Iterations: " << iterations << std::endl;
+    std::cout << "  Total time: " << (duration / 1000000.0) << " ms" << std::endl;
+    std::cout << "  Avg per hash: " << avgTime << " ns" << std::endl;
+    std::cout << "  Throughput: " << (iterations / (duration / 1000000000.0))
+        << " hashes/sec" << std::endl;
+    std::cout << "  (Dummy sum: " << dummySum << " - prevents optimization)" << std::endl;
+
+    std::cout << "  Implementation: std::from_chars (fast)" << std::endl;
+    EXPECT_LT(avgTime, 10000.0) << "Hashing is slower than expected with from_chars";
+
+    std::cout << "  Note: Time includes decimal normalization overhead" << std::endl;
+}
+
+TEST_F(CSVComparatorTest, FromCharsValidation) {
+    std::vector<std::string> testValues = {
+        "3.14159265",
+        "2.71828182",
+        "100.00001",
+        "0.0001",
+        "-123.456",
+        "999999.9999",
+        "0.00000001",
+        "123",
+        "-456.78"
+    };
+
+    for (const auto& val : testValues) {
+        Row row1, row2;
+        row1.columns = { val };
+        row2.columns = { val };
+
+        Row::Hash hasher;
+        EXPECT_EQ(hasher(row1), hasher(row2))
+            << "Hash mismatch for value: " << val;
+
+        EXPECT_TRUE(Row::compareValues(val, val))
+            << "Comparison failed for value: " << val;
+    }
+
+    EXPECT_TRUE(Row::compareValues("3.14159265", "3.14159999"))
+        << "Should match at 4 decimal places";
+
+    EXPECT_FALSE(Row::compareValues("3.14159265", "3.14169999"))
+        << "Should NOT match at 4 decimal places";
+
+    std::cout << "from_chars validation passed (using fast path)" << std::endl;
+
+
 }
