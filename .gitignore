@@ -6,8 +6,8 @@
 /CMakeFiles/
 /install/
 /Testing/
-!/build/src/Release/csv_compare.exe
-!/build/tests/Release/csv_comparator_test.exe
+!/build/src/Release/file_compare.exe
+!/build/tests/Release/file_comparator_test.exe
 
 # Visual Studio specific files
 .vs/

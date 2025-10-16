@@ -1,4 +1,4 @@
-﻿#include "csv_comparator.h"
+﻿#include "file_comparator.h"
 #include <iostream>
 #include <cstdio>
 #include <sstream>
@@ -16,12 +16,24 @@ std::string formatRow(const Row& row) {
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <file1.csv> <file2.csv>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <file1> <file2>" << std::endl;
         std::cerr << std::endl;
-        std::cerr << "CSV Comparator - High-performance CSV file comparison" << std::endl;
-        std::cerr << "Compares two CSV files and reports differences." << std::endl;
-        std::cerr << "Files can be in any order (order-independent comparison)." << std::endl;
-        std::cerr << "Decimal numbers are compared to 4 decimal places." << std::endl;
+        std::cerr << "File Comparator - High-performance file comparison" << std::endl;
+        std::cerr << "Compares two CSV or XLSX files and reports differences." << std::endl;
+        std::cerr << std::endl;
+        std::cerr << "Supported formats:" << std::endl;
+        std::cerr << "  - CSV  (.csv)" << std::endl;
+        std::cerr << "  - XLSX (.xlsx)" << std::endl;
+        std::cerr << std::endl;
+        std::cerr << "Features:" << std::endl;
+        std::cerr << "  - Order-independent comparison" << std::endl;
+        std::cerr << "  - Decimal numbers compared to 4 decimal places" << std::endl;
+        std::cerr << "  - Mixed format comparison (CSV vs XLSX)" << std::endl;
+        std::cerr << std::endl;
+        std::cerr << "Examples:" << std::endl;
+        std::cerr << "  " << argv[0] << " data1.csv data2.csv" << std::endl;
+        std::cerr << "  " << argv[0] << " report1.xlsx report2.xlsx" << std::endl;
+        std::cerr << "  " << argv[0] << " export.csv backup.xlsx" << std::endl;
         return 1;
     }
 
@@ -29,7 +41,7 @@ int main(int argc, char* argv[]) {
         std::string file1 = argv[1];
         std::string file2 = argv[2];
 
-        CSVComparator comparator;
+        FileComparator comparator;
         auto result = comparator.compare(file1, file2);
 
         std::cout << std::endl;
@@ -56,16 +68,26 @@ int main(int argc, char* argv[]) {
 
             if (!result.onlyInFile1.empty()) {
                 std::cout << "Rows only in File 1 (" << file1 << "):" << std::endl;
-                for (const auto& row : result.onlyInFile1) {
-                    std::cout << "  " << formatRow(row) << std::endl;
+                size_t displayCount = std::min(result.onlyInFile1.size(), size_t(10));
+                for (size_t i = 0; i < displayCount; ++i) {
+                    std::cout << "  " << formatRow(result.onlyInFile1[i]) << std::endl;
+                }
+                if (result.onlyInFile1.size() > 10) {
+                    std::cout << "  ... and " << (result.onlyInFile1.size() - 10)
+                        << " more rows" << std::endl;
                 }
                 std::cout << std::endl;
             }
 
             if (!result.onlyInFile2.empty()) {
                 std::cout << "Rows only in File 2 (" << file2 << "):" << std::endl;
-                for (const auto& row : result.onlyInFile2) {
-                    std::cout << "  " << formatRow(row) << std::endl;
+                size_t displayCount = std::min(result.onlyInFile2.size(), size_t(10));
+                for (size_t i = 0; i < displayCount; ++i) {
+                    std::cout << "  " << formatRow(result.onlyInFile2[i]) << std::endl;
+                }
+                if (result.onlyInFile2.size() > 10) {
+                    std::cout << "  ... and " << (result.onlyInFile2.size() - 10)
+                        << " more rows" << std::endl;
                 }
                 std::cout << std::endl;
             }

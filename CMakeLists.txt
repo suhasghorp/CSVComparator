@@ -29,6 +29,6 @@ enable_testing()
 add_subdirectory(tests)
 
 # Installation rules
-install(TARGETS csv_compare
+install(TARGETS file_compare
     RUNTIME DESTINATION bin
 )
